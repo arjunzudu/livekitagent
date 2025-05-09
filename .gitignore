@@ -1,0 +1,23 @@
+# Python virtual environment
+venv/
+venv_new/
+
+# Environment variables
+.env
+
+# FAISS index (optional, if you don’t want to share embeddings)
+faiss_index/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE files (if you use VS Code or PyCharm)
+.vscode/
+.idea/
+
+# Other temporary files
+*.log
+*.tmp
