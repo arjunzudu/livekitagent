@@ -1,6 +1,7 @@
 import asyncio
 import time
 import logging
+from datetime import datetime
 from livekit import agents
 from livekit.agents import llm as livekit_llm
 from livekit.agents.llm import ChatMessage
@@ -9,12 +10,16 @@ from livekit.agents.voice.agent import ModelSettings
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Custom timestamp format
+def get_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+
 class Assistant(agents.Agent):
     def __init__(self, session, vectorstore):
         super().__init__(
             instructions="""
 # Role:
- you are a Zudu  AI voice agent, designed to engage visitors on our website, capture essential lead information, and understand how businesses can benefit from AI-powered conversational agents.
+Zudu is an AI voice agent designed to engage visitors on our website, capture essential lead information, and understand how businesses can benefit from AI-powered conversational agents.
 
 # Skills:
 - Warm, professional, and engaging conversation style.
@@ -72,6 +77,7 @@ Once collected, the data should be structured and stored for follow-up by the Zu
         from .utils import cached_retrieval
 
         # Check for user query
+        user_query = ""
         if chat_ctx.items and isinstance(chat_ctx.items[-1], ChatMessage) and chat_ctx.items[-1].role == "user":
             user_query = chat_ctx.items[-1].text_content or ""
             if user_query.strip():
@@ -83,8 +89,9 @@ Once collected, the data should be structured and stored for follow-up by the Zu
                     context = await asyncio.get_event_loop().run_in_executor(
                         None, lambda: cached_retrieval(user_query, self.vectorstore)
                     )
-                    print(f"[RAG] Retrieval took {time.time() - start_time:.2f} seconds")
-                    print(f"[RAG] Injected context: {context[:100].replace(chr(10), ' | ')}...")
+                    end_time = time.time()
+                    print(f"[{get_timestamp()}] RAG Timing: Retrieval took {end_time - start_time:.2f} seconds")
+                    print(f"[{get_timestamp()}] RAG Timing: Injected context: {context[:100].replace(chr(10), ' | ')}...")
 
                     # Inject context into chat
                     if chat_ctx.items and isinstance(chat_ctx.items[0], ChatMessage) and chat_ctx.items[0].role == "system":
@@ -92,13 +99,19 @@ Once collected, the data should be structured and stored for follow-up by the Zu
                     else:
                         chat_ctx.items.insert(0, ChatMessage(role="system", content=[context]))
                 except Exception as e:
-                    print(f"[RAG] Retrieval error: {str(e)}")
+                    print(f"[{get_timestamp()}] RAG Error: Retrieval error: {str(e)}")
                     # Fallback to default response without context
                     if chat_ctx.items and isinstance(chat_ctx.items[0], ChatMessage) and chat_ctx.items[0].role == "system":
                         chat_ctx.items[0].content.append("No relevant context found.")
                     else:
                         chat_ctx.items.insert(0, ChatMessage(role="system", content=["No relevant context found."]))
 
-        # Delegate to default LLM node implementation
+        # Log query sent to LLM
+        print(f"[{get_timestamp()}] LLM Query Sent: {user_query}")
+
+        # Delegate to default LLM node implementation and log response received
+        start_time = time.time()
         async for chunk in agents.Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             yield chunk
+        end_time = time.time()
+        print(f"[{get_timestamp()}] LLM Query Received: Response took {end_time - start_time:.2f} seconds")
