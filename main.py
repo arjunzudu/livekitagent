@@ -132,13 +132,15 @@ async def entrypoint(ctx: agents.JobContext):
     await ctx.connect()
 
     session = AgentSession(
-        stt=deepgram.STT(model="nova-3", language="multi"),
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=cartesia.TTS(),
-        vad=silero.VAD.load(),
-        turn_detection=MultilingualModel(),
-    )
-
+            stt=deepgram.STT(model="nova-3", language="multi"),
+            llm=openai.LLM(model="gpt-4o"),
+            tts=elevenlabs.TTS(
+                voice_id="pzxut4zZz4GImZNlqQ3H",
+                model="eleven_multilingual_v2"
+            ),
+            vad=silero.VAD.load(),
+            turn_detection=MultilingualModel(),
+        )
     agent = Assistant(session=session)
 
     await session.start(
