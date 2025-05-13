@@ -1,15 +1,20 @@
+import asyncio
+import time
+import logging
 from livekit import agents
 from livekit.agents import llm as livekit_llm
 from livekit.agents.llm import ChatMessage
 from livekit.agents.voice.agent import ModelSettings
-import asyncio
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class Assistant(agents.Agent):
     def __init__(self, session, vectorstore):
         super().__init__(
             instructions="""
 # Role:
-Zudu is an AI voice agent designed to engage visitors on our website, capture essential lead information, and understand how businesses can benefit from AI-powered conversational agents.
+ you are a Zudu  AI voice agent, designed to engage visitors on our website, capture essential lead information, and understand how businesses can benefit from AI-powered conversational agents.
 
 # Skills:
 - Warm, professional, and engaging conversation style.
@@ -34,6 +39,7 @@ Once collected, the data should be structured and stored for follow-up by the Zu
 5. If the visitor does not want to provide information, thank them politely and end the interaction gracefully.
 6. Always confirm details before concluding and ask if there’s anything else they’d like to know.
 7. If the visitor asks any questions about Zudu, refer knowledge base to answer.
+8. If the visitor mentions 'Zulu,' they likely mean the historical Zulu Kingdom, founded by Shaka kaSenzangakhona (Shaka Zulu) around 1816, not Zudu. Clarify the context before responding (e.g., 'Did you mean the Zulu Kingdom, or are you asking about Zudu’s services?').
 
 # Steps & Sample Dialogues:
 1. Introduction and greeting:
@@ -55,6 +61,7 @@ Once collected, the data should be structured and stored for follow-up by the Zu
         )
         self.vectorstore = vectorstore
         self._session = session
+        logger.debug(f"Vectorstore type in Assistant init: {type(self.vectorstore)}")
 
     async def llm_node(
         self,
@@ -69,18 +76,21 @@ Once collected, the data should be structured and stored for follow-up by the Zu
             user_query = chat_ctx.items[-1].text_content or ""
             if user_query.strip():
                 try:
-                    # Perform retrieval asynchronously
+                    # Log vectorstore type before retrieval
+                    logger.debug(f"Vectorstore type before cached_retrieval: {type(self.vectorstore)}")
+                    # Perform retrieval asynchronously with timing
+                    start_time = time.time()
                     context = await asyncio.get_event_loop().run_in_executor(
                         None, lambda: cached_retrieval(user_query, self.vectorstore)
                     )
+                    print(f"[RAG] Retrieval took {time.time() - start_time:.2f} seconds")
+                    print(f"[RAG] Injected context: {context[:100].replace(chr(10), ' | ')}...")
 
                     # Inject context into chat
                     if chat_ctx.items and isinstance(chat_ctx.items[0], ChatMessage) and chat_ctx.items[0].role == "system":
                         chat_ctx.items[0].content.append(context)
                     else:
                         chat_ctx.items.insert(0, ChatMessage(role="system", content=[context]))
-
-                    print(f"[RAG] Injected context: {context[:100].replace(chr(10), ' | ')}...")
                 except Exception as e:
                     print(f"[RAG] Retrieval error: {str(e)}")
                     # Fallback to default response without context

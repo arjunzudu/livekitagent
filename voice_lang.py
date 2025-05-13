@@ -1,7 +1,11 @@
+import logging
 from src.config import load_config
 from src.vector_store import setup_vector_store
 from src.session import entrypoint
 from livekit import agents
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # Load configuration
@@ -9,6 +13,7 @@ if __name__ == "__main__":
 
     # Set up vector store
     vectorstore = setup_vector_store(config["data_dir"], config["faiss_index_path"])
+    logger.debug(f"Vectorstore type: {type(vectorstore)}")
 
     # Run the LiveKit agent
     agents.cli.run_app(agents.WorkerOptions(
