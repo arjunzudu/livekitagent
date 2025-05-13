@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: llama-index-agent-openai
+Version: 0.4.7
+Summary: llama-index agent openai integration
+Author-email: Your Name <you@example.com>
+License-Expression: MIT
+License-File: LICENSE
+Requires-Python: <4.0,>=3.9
+Requires-Dist: llama-index-core<0.13,>=0.12.18
+Requires-Dist: llama-index-llms-openai<0.4,>=0.3.0
+Requires-Dist: openai>=1.14.0
+Description-Content-Type: text/markdown
+
+# LlamaIndex Agent Integration: Openai
