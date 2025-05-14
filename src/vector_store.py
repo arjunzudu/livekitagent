@@ -6,10 +6,6 @@ from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 def setup_vector_store(data_dir, faiss_index_path):
     """Set up or load an optimized FAISS vector store."""
@@ -27,7 +23,6 @@ def setup_vector_store(data_dir, faiss_index_path):
             rebuild = True
 
     if not index_exists or rebuild:
-        print("🔍 FAISS index not found or PDFs changed, rebuilding...")
         loader = DirectoryLoader(str(data_dir), glob="*.pdf", loader_cls=PyPDFLoader)
         documents = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -45,11 +40,9 @@ def setup_vector_store(data_dir, faiss_index_path):
         # Choose index type based on number of vectors
         num_vectors = len(embedding_vectors)
         if num_vectors < 100:
-            print(f"⚠️ Using IndexFlatL2 due to small number of vectors ({num_vectors})")
             index = faiss.IndexFlatL2(embedding_vectors.shape[1])
         else:
             nlist = min(100, max(1, int(np.sqrt(num_vectors))))
-            print(f"🔧 Using IndexIVFFlat with {nlist} clusters for {num_vectors} vectors")
             index = faiss.IndexIVFFlat(faiss.IndexFlatL2(embedding_vectors.shape[1]), embedding_vectors.shape[1], nlist)
             index.train(embedding_vectors)
         
@@ -66,14 +59,11 @@ def setup_vector_store(data_dir, faiss_index_path):
         
         # Set the embedding function to the callable method
         vectorstore.embedding_function = embeddings.embed_query
-        logger.debug(f"Embedding function type after setting: {type(vectorstore.embedding_function)}")
         
         vectorstore.save_local(str(faiss_index_path))
         with open(faiss_index_path / "pdf_hashes.json", "w") as f:
             json.dump(pdf_hashes, f)
-        print("✅ FAISS index built and saved.")
     else:
-        print("📦 Loading existing FAISS index from disk...")
         embeddings = OpenAIEmbeddings()
         vectorstore = FAISS.load_local(
             str(faiss_index_path),
@@ -82,7 +72,4 @@ def setup_vector_store(data_dir, faiss_index_path):
         )
         # Ensure embedding_function is callable
         vectorstore.embedding_function = embeddings.embed_query
-        logger.debug(f"FAISS index type after loading: {type(vectorstore.index)}")
-        logger.debug(f"Embedding function type after loading: {type(vectorstore.embedding_function)}")
-        print("✅ FAISS index loaded.")
     return vectorstore

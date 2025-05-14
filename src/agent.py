@@ -1,21 +1,11 @@
 import asyncio
-import time
-import logging
-from datetime import datetime
 from livekit import agents
 from livekit.agents import llm as livekit_llm
 from livekit.agents.llm import ChatMessage
 from livekit.agents.voice.agent import ModelSettings
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-# Custom timestamp format
-def get_timestamp():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
-
 class Assistant(agents.Agent):
-    def __init__(self, session, vectorstore):
+    def __init__(self, session, vectorstore, ctx):
         super().__init__(
             instructions="""
 # Role:
@@ -66,7 +56,7 @@ Once collected, the data should be structured and stored for follow-up by the Zu
         )
         self.vectorstore = vectorstore
         self._session = session
-        logger.debug(f"Vectorstore type in Assistant init: {type(self.vectorstore)}")
+        self._ctx = ctx
 
     async def llm_node(
         self,
@@ -76,42 +66,26 @@ Once collected, the data should be structured and stored for follow-up by the Zu
     ):
         from .utils import cached_retrieval
 
-        # Check for user query
         user_query = ""
         if chat_ctx.items and isinstance(chat_ctx.items[-1], ChatMessage) and chat_ctx.items[-1].role == "user":
             user_query = chat_ctx.items[-1].text_content or ""
             if user_query.strip():
                 try:
-                    # Log vectorstore type before retrieval
-                    logger.debug(f"Vectorstore type before cached_retrieval: {type(self.vectorstore)}")
-                    # Perform retrieval asynchronously with timing
-                    start_time = time.time()
                     context = await asyncio.get_event_loop().run_in_executor(
                         None, lambda: cached_retrieval(user_query, self.vectorstore)
                     )
-                    end_time = time.time()
-                    print(f"[{get_timestamp()}] RAG Timing: Retrieval took {end_time - start_time:.2f} seconds")
-                    print(f"[{get_timestamp()}] RAG Timing: Injected context: {context[:100].replace(chr(10), ' | ')}...")
+                except Exception:
+                    context = "No relevant context found."
+                chat_ctx.items.insert(
+                    1 if any(msg.role == "system" for msg in chat_ctx.items) else 0,
+                    ChatMessage(role="system", content=[context])
+                )
 
-                    # Inject context into chat
-                    if chat_ctx.items and isinstance(chat_ctx.items[0], ChatMessage) and chat_ctx.items[0].role == "system":
-                        chat_ctx.items[0].content.append(context)
-                    else:
-                        chat_ctx.items.insert(0, ChatMessage(role="system", content=[context]))
-                except Exception as e:
-                    print(f"[{get_timestamp()}] RAG Error: Retrieval error: {str(e)}")
-                    # Fallback to default response without context
-                    if chat_ctx.items and isinstance(chat_ctx.items[0], ChatMessage) and chat_ctx.items[0].role == "system":
-                        chat_ctx.items[0].content.append("No relevant context found.")
-                    else:
-                        chat_ctx.items.insert(0, ChatMessage(role="system", content=["No relevant context found."]))
+        system_messages = [msg for msg in chat_ctx.items if msg.role == "system"]
+        conversation_messages = [msg for msg in chat_ctx.items if msg.role != "system"]
+        current_user_message = conversation_messages[-1] if conversation_messages else None
+        limited_conversation = [current_user_message] if current_user_message else []
+        chat_ctx.items = system_messages + limited_conversation
 
-        # Log query sent to LLM
-        print(f"[{get_timestamp()}] LLM Query Sent: {user_query}")
-
-        # Delegate to default LLM node implementation and log response received
-        start_time = time.time()
         async for chunk in agents.Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             yield chunk
-        end_time = time.time()
-        print(f"[{get_timestamp()}] LLM Query Received: Response took {end_time - start_time:.2f} seconds")
