@@ -76,16 +76,13 @@ Once collected, the data should be structured and stored for follow-up by the Zu
                     )
                 except Exception:
                     context = "No relevant context found."
+                # Insert RAG context as a system message, preserving existing messages
                 chat_ctx.items.insert(
                     1 if any(msg.role == "system" for msg in chat_ctx.items) else 0,
                     ChatMessage(role="system", content=[context])
                 )
 
-        system_messages = [msg for msg in chat_ctx.items if msg.role == "system"]
-        conversation_messages = [msg for msg in chat_ctx.items if msg.role != "system"]
-        current_user_message = conversation_messages[-1] if conversation_messages else None
-        limited_conversation = [current_user_message] if current_user_message else []
-        chat_ctx.items = system_messages + limited_conversation
-
+        # Keep all messages in the chat context (system, user, and assistant)
+        # No need to filter or limit conversation history
         async for chunk in agents.Agent.default.llm_node(self, chat_ctx, tools, model_settings):
             yield chunk

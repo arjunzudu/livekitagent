@@ -2,6 +2,7 @@ import asyncio
 from livekit import agents
 from livekit.agents import AgentSession, RoomInputOptions
 from livekit.plugins import openai, elevenlabs, deepgram, silero
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 async def entrypoint(ctx: agents.JobContext, vectorstore):
     tasks = []
@@ -21,7 +22,7 @@ async def entrypoint(ctx: agents.JobContext, vectorstore):
                 model="eleven_multilingual_v2"
             )
 
-        # Simplified AgentSession
+        # Simplified AgentSession with turn detection
         session = AgentSession(
             stt=deepgram.STT(
                 model="nova-2",
@@ -30,7 +31,7 @@ async def entrypoint(ctx: agents.JobContext, vectorstore):
             llm=openai.LLM(model="gpt-4o"),
             tts=tts,
             vad=silero.VAD.load(),
-            turn_detection=None,
+            turn_detection=MultilingualModel(),
         )
 
         # Import Assistant
@@ -63,9 +64,12 @@ async def entrypoint(ctx: agents.JobContext, vectorstore):
         for task in tasks:
             if not task.done():
                 task.cancel()
+        # Properly await task cancellation
         try:
             await asyncio.gather(*tasks, return_exceptions=True)
-        except:
+        except asyncio.CancelledError:
+            pass
+        except Exception:
             pass
 
         # Cleanup session resources
