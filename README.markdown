@@ -52,7 +52,7 @@ Key features:
 ## Usage
 1. **Run the Application**:
    ```bash
-   python main.py
+   python main.py console
    ```
    This starts the LiveKit Agents worker, initializes the vector database index, and begins listening for voice inputs.
 
