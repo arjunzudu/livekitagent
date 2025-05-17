@@ -84,13 +84,7 @@ Key features:
   ```
 - **RAG Parameters**: Adjust `similarity_top_k` in the `as_retriever()` call to balance retrieval speed and accuracy.
 
-## Contributing
-Contributions are welcome! Please follow these steps:
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Make your changes and commit (`git commit -m "Add your feature"`).
-4. Push to your branch (`git push origin feature/your-feature`).
-5. Open a pull request.
+
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
