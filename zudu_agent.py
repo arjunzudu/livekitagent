@@ -12,6 +12,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class Assistant(Agent):
+    TRIGGER_WORDS = [
+        "who", "what", "where", "when", "why", "how",
+        "tell me", "explain", "describe", "give me",
+        "information about", "details on", "facts about",
+        "use case", "vision", "founder", "contact number",
+        # Add more relevant keywords based on your documents
+    ]
+
     def __init__(self, session: AgentSession, index):
         with open("instructions.txt", "r") as f:
             instructions = f.read()
@@ -49,27 +57,32 @@ class Assistant(Agent):
         if chat_ctx.items and isinstance(chat_ctx.items[-1], ChatMessage) and chat_ctx.items[-1].role == "user":
             user_query = chat_ctx.items[-1].text_content or ""
             if user_query.strip():
-                # Start timing RAG
-                rag_start_time = time.time()
-                
-                # Fetch RAG context
-                retriever = self.index.as_retriever()
-                nodes = await retriever.aretrieve(user_query)
+                # Check if the query contains any trigger words (case-insensitive)
+                if any(trigger.lower() in user_query.lower() for trigger in self.TRIGGER_WORDS):
+                    logger.info(f"Performing RAG for query: {user_query[:50]}...")
+                    # Start timing RAG
+                    rag_start_time = time.time()
+                    
+                    # Fetch RAG context
+                    retriever = self.index.as_retriever()
+                    nodes = await retriever.aretrieve(user_query)
 
-                context = "Relevant context from documents:\n"
-                for node in nodes:
-                    node_content = node.get_content(metadata_mode=MetadataMode.LLM)
-                    context += f"\n\n{node_content}"
+                    context = "Relevant context from documents:\n"
+                    for node in nodes:
+                        node_content = node.get_content(metadata_mode=MetadataMode.LLM)
+                        context += f"\n\n{node_content}"
 
-                # Inject into system message of the chat context being used
-                if chat_ctx_to_use.items and isinstance(chat_ctx_to_use.items[0], ChatMessage) and chat_ctx_to_use.items[0].role == "system":
-                    chat_ctx_to_use.items[0].content.append(context)
+                    # Inject into system message of the chat context being used
+                    if chat_ctx_to_use.items and isinstance(chat_ctx_to_use.items[0], ChatMessage) and chat_ctx_to_use.items[0].role == "system":
+                        chat_ctx_to_use.items[0].content.append(context)
+                    else:
+                        chat_ctx_to_use.items.insert(0, ChatMessage(role="system", content=[context]))
+
+                    rag_time = time.time() - rag_start_time
+                    logger.info(f"RAG query processed in {rag_time:.2f} seconds for query: {user_query[:50]}...")
+                    print(f"[RAG] Injected context: {context[:100].replace(chr(10), ' | ')}...")
                 else:
-                    chat_ctx_to_use.items.insert(0, ChatMessage(role="system", content=[context]))
-
-                rag_time = time.time() - rag_start_time
-                logger.info(f"RAG query processed in {rag_time:.2f} seconds for query: {user_query[:50]}...")
-                print(f"[RAG] Injected context: {context[:100].replace(chr(10), ' | ')}...")
+                    logger.info(f"Skipping RAG for query: {user_query[:50]}...")
 
         # Log LLM query sent
         llm_query_sent_time = time.time()
