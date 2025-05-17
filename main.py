@@ -8,7 +8,7 @@ from config import load_config, get_project_dirs
 from indexing import load_or_create_index
 from zudu_agent import Assistant
 
-# Configure logging for debugging
+# Configure logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 
 async def entrypoint(ctx: agents.JobContext):
@@ -20,6 +20,7 @@ async def entrypoint(ctx: agents.JobContext):
         # Load or create index with error handling
         try:
             index = load_or_create_index(dirs["persist_dir"], dirs["data_dir"])
+            logging.info(f"Index loaded in main.py with vector store: {type(index.vector_store)}")
         except Exception as e:
             logging.error(f"Failed to load or create index: {str(e)}")
             return

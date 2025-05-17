@@ -19,6 +19,8 @@ class Assistant(Agent):
         self.index = index
         self._session = session
         self.interaction_count = 0  # Initialize interaction counter
+        # Log the vector store type to confirm cloud retrieval
+        logger.info(f"Assistant initialized with vector store: {type(self.index.vector_store)}")
 
     async def llm_node(
         self,
@@ -39,11 +41,9 @@ class Assistant(Agent):
             chat_ctx_to_use = chat_ctx
         else:
             # Use short system message and last three messages (last two user messages + assistant response)
-           
-            
             conversation_history = chat_ctx.items[-3:]  # Last 3 messages: user(n-1), assistant(n-1), user(n)
             chat_ctx_to_use = livekit_llm.ChatContext()
-            chat_ctx_to_use.items =  conversation_history
+            chat_ctx_to_use.items = conversation_history
 
         # Only run retrieval if the last message is from the user
         if chat_ctx.items and isinstance(chat_ctx.items[-1], ChatMessage) and chat_ctx.items[-1].role == "user":
